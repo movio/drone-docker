@@ -56,6 +56,7 @@ func main() {
 		registry = defaultRegistry
 	}
 
+
 	if err != nil {
 		log.Fatal(fmt.Sprintf("error getting ECR auth: %v", err))
 	}
