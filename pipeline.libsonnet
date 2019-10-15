@@ -49,6 +49,7 @@ local golang_image(os, version) =
       trigger: {
         ref: [
           'refs/heads/master',
+          'refs/heads/movio',
           'refs/tags/**',
           'refs/pull/**',
         ],
@@ -201,6 +202,7 @@ local golang_image(os, version) =
       trigger: {
         ref: [
           'refs/heads/master',
+          'refs/heads/movio',
           'refs/tags/**',
         ],
       },

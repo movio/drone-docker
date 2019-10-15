@@ -46,6 +46,7 @@
    "trigger": {
       "ref": [
          "refs/heads/master",
+         "refs/heads/movio",
          "refs/tags/**",
          "refs/pull/**"
       ]
@@ -441,6 +442,7 @@
    "trigger": {
       "ref": [
          "refs/heads/master",
+         "refs/heads/movio",
          "refs/tags/**"
       ]
    }
@@ -1126,6 +1128,7 @@
    "trigger": {
       "ref": [
          "refs/heads/master",
+         "refs/heads/movio",
          "refs/tags/**"
       ]
    }
