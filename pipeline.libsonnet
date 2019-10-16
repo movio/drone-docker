@@ -65,7 +65,8 @@ local golang_image(os, version) =
     local golang = golang_image(os, version);
     local plugin_repo = '864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/' + name;
     local extension = if is_windows then '.exe' else '';
-    local depends_on = if name == 'docker' then [test_pipeline_name] else [tag + '-docker'];
+    // local depends_on = if name == 'docker' then [test_pipeline_name] else [tag + '-docker'];
+    local depends_on =  [test_pipeline_name];
     {
       kind: 'pipeline',
       name: tag + '-' + name,

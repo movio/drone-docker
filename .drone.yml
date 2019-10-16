@@ -114,6 +114,6 @@ trigger:
   - refs/pull/**
 
 depends_on:
-- linux-amd64-docker
+- testing
 
 ...
