@@ -83,7 +83,7 @@ steps:
     dry_run: true
     password:
       from_secret: docker_password
-    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+    repo: plugins/ecr
     tags: linux-amd64
     username:
       from_secret: docker_username
@@ -100,7 +100,7 @@ steps:
     create: true
     daemon_off: false
     dockerfile: docker/ecr/Dockerfile.linux.amd64
-    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+    repo: plugins/ecr
   when:
     event:
       exclude:

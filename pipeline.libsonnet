@@ -63,7 +63,7 @@ local golang_image(os, version) =
     local file_suffix = std.strReplace(tag, '-', '.');
     local volumes = if is_windows then [{ name: windows_pipe_volume, path: windows_pipe }] else [];
     local golang = golang_image(os, version);
-    local plugin_repo = '864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/' + name;
+    local plugin_repo = 'plugins/' + name;
     local extension = if is_windows then '.exe' else '';
     // local depends_on = if name == 'docker' then [test_pipeline_name] else [tag + '-docker'];
     local depends_on =  [test_pipeline_name];
