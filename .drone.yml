@@ -100,6 +100,7 @@ steps:
     create: true
     daemon_off: false
     dockerfile: docker/ecr/Dockerfile.linux.amd64
+    region: ap-southeast-2
     repo: plugins/ecr
   when:
     event:

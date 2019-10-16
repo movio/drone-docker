@@ -143,6 +143,7 @@ local golang_image(os, version) =
             auto_tag_suffix: tag,
             daemon_off: if is_windows then 'true' else 'false',
             dockerfile: 'docker/' + name + '/Dockerfile.' + file_suffix,
+            region: 'ap-southeast-2',
             create: true,
             repo: plugin_repo,
             // username: { from_secret: 'docker_username' },
