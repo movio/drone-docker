@@ -136,7 +136,7 @@ local golang_image(os, version) =
         },
         {
           name: 'publish',
-          image: 'plugins/docker:' + tag,
+          image: 'plugins/ecr:' + tag,
           pull: 'always',
           settings: {
             auto_tag: true,
