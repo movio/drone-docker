@@ -49,6 +49,7 @@ local golang_image(os, version) =
       trigger: {
         ref: [
           'refs/heads/master',
+          'refs/heads/movio',
           'refs/tags/**',
           'refs/pull/**',
         ],
@@ -62,7 +63,7 @@ local golang_image(os, version) =
     local file_suffix = std.strReplace(tag, '-', '.');
     local volumes = if is_windows then [{ name: windows_pipe_volume, path: windows_pipe }] else [];
     local golang = golang_image(os, version);
-    local plugin_repo = 'plugins/' + name;
+    local plugin_repo = '864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/' + name;
     local extension = if is_windows then '.exe' else '';
     local depends_on = if name == 'docker' then [test_pipeline_name] else [tag + '-docker'];
     {
@@ -141,9 +142,10 @@ local golang_image(os, version) =
             auto_tag_suffix: tag,
             daemon_off: if is_windows then 'true' else 'false',
             dockerfile: 'docker/' + name + '/Dockerfile.' + file_suffix,
+            create: true,
             repo: plugin_repo,
-            username: { from_secret: 'docker_username' },
-            password: { from_secret: 'docker_password' },
+            // username: { from_secret: 'docker_username' },
+            // password: { from_secret: 'docker_password' },
           },
           volumes: if std.length(volumes) > 0 then volumes,
           when: {
@@ -156,6 +158,7 @@ local golang_image(os, version) =
       trigger: {
         ref: [
           'refs/heads/master',
+          'refs/heads/movio',
           'refs/tags/**',
           'refs/pull/**',
         ],
@@ -199,6 +202,7 @@ local golang_image(os, version) =
       trigger: {
         ref: [
           'refs/heads/master',
+          'refs/heads/movio',
           'refs/tags/**',
         ],
       },
