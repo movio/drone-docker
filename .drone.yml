@@ -288,45 +288,6 @@ depends_on:
 
 ---
 kind: pipeline
-name: notifications-docker
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-- name: manifest
-  pull: always
-  image: plugins/manifest
-  settings:
-    auto_tag: true
-    ignore_missing: true
-    password:
-      from_secret: docker_password
-    spec: docker/docker/manifest.tmpl
-    username:
-      from_secret: docker_username
-
-- name: microbadger
-  pull: always
-  image: plugins/webhook
-  settings:
-    urls:
-      from_secret: microbadger_docker
-
-trigger:
-  ref:
-  - refs/heads/master
-  - refs/heads/movio
-  - refs/tags/**
-
-depends_on:
-- linux-amd64-docker
-- linux-arm64-docker
-- linux-arm-docker
-
----
-kind: pipeline
 name: linux-amd64-acr
 
 platform:
@@ -780,44 +741,5 @@ trigger:
 
 depends_on:
 - linux-arm-docker
-
----
-kind: pipeline
-name: notifications-ecr
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-- name: manifest
-  pull: always
-  image: plugins/manifest
-  settings:
-    auto_tag: true
-    ignore_missing: true
-    password:
-      from_secret: docker_password
-    spec: docker/ecr/manifest.tmpl
-    username:
-      from_secret: docker_username
-
-- name: microbadger
-  pull: always
-  image: plugins/webhook
-  settings:
-    urls:
-      from_secret: microbadger_ecr
-
-trigger:
-  ref:
-  - refs/heads/master
-  - refs/heads/movio
-  - refs/tags/**
-
-depends_on:
-- linux-amd64-ecr
-- linux-arm64-ecr
-- linux-arm-ecr
 
 ...
