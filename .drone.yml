@@ -1,1136 +1,823 @@
 ---
-{
-   "kind": "pipeline",
-   "name": "testing",
-   "platform": {
-      "arch": "amd64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go vet ./..."
-         ],
-         "environment": {
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "vet",
-         "pull": "always",
-         "volumes": [
-            {
-               "name": "gopath",
-               "path": "/go"
-            }
-         ]
-      },
-      {
-         "commands": [
-            "go test -cover ./..."
-         ],
-         "environment": {
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "test",
-         "pull": "always",
-         "volumes": [
-            {
-               "name": "gopath",
-               "path": "/go"
-            }
-         ]
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": [
-      {
-         "name": "gopath",
-         "temp": { }
-      }
-   ]
-}
+kind: pipeline
+name: testing
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: vet
+  pull: always
+  image: golang:1.11
+  commands:
+  - go vet ./...
+  environment:
+    GO111MODULE: on
+  volumes:
+  - name: gopath
+    path: /go
+
+- name: test
+  pull: always
+  image: golang:1.11
+  commands:
+  - go test -cover ./...
+  environment:
+    GO111MODULE: on
+  volumes:
+  - name: gopath
+    path: /go
+
+volumes:
+- name: gopath
+  temp: {}
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
 ---
-{
-   "depends_on": [
-      "testing"
-   ],
-   "kind": "pipeline",
-   "name": "linux-amd64-docker",
-   "platform": {
-      "arch": "amd64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/amd64/drone-docker ./cmd/drone-docker"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/amd64/drone-docker ./cmd/drone-docker"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      {
-         "commands": [
-            "./release/linux/amd64/drone-docker --help"
-         ],
-         "image": "golang:1.11",
-         "name": "executable",
-         "pull": "always"
-      },
-      {
-         "image": "plugins/docker:linux-amd64",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/docker/Dockerfile.linux.amd64",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker",
-            "tags": "linux-amd64",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-amd64",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-amd64",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/docker/Dockerfile.linux.amd64",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-amd64-docker
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/amd64/drone-docker ./cmd/drone-docker
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/amd64/drone-docker ./cmd/drone-docker
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: executable
+  pull: always
+  image: golang:1.11
+  commands:
+  - ./release/linux/amd64/drone-docker --help
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-amd64
+  settings:
+    daemon_off: false
+    dockerfile: docker/docker/Dockerfile.linux.amd64
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker
+    tags: linux-amd64
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-amd64
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-amd64
+    create: true
+    daemon_off: false
+    dockerfile: docker/docker/Dockerfile.linux.amd64
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- testing
+
 ---
-{
-   "depends_on": [
-      "testing"
-   ],
-   "kind": "pipeline",
-   "name": "linux-arm64-docker",
-   "platform": {
-      "arch": "arm64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/arm64/drone-docker ./cmd/drone-docker"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/arm64/drone-docker ./cmd/drone-docker"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      {
-         "commands": [
-            "./release/linux/arm64/drone-docker --help"
-         ],
-         "image": "golang:1.11",
-         "name": "executable",
-         "pull": "always"
-      },
-      {
-         "image": "plugins/docker:linux-arm64",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/docker/Dockerfile.linux.arm64",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker",
-            "tags": "linux-arm64",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-arm64",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-arm64",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/docker/Dockerfile.linux.arm64",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-arm64-docker
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/arm64/drone-docker ./cmd/drone-docker
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/arm64/drone-docker ./cmd/drone-docker
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: executable
+  pull: always
+  image: golang:1.11
+  commands:
+  - ./release/linux/arm64/drone-docker --help
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-arm64
+  settings:
+    daemon_off: false
+    dockerfile: docker/docker/Dockerfile.linux.arm64
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker
+    tags: linux-arm64
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-arm64
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-arm64
+    create: true
+    daemon_off: false
+    dockerfile: docker/docker/Dockerfile.linux.arm64
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- testing
+
 ---
-{
-   "depends_on": [
-      "testing"
-   ],
-   "kind": "pipeline",
-   "name": "linux-arm-docker",
-   "platform": {
-      "arch": "arm",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/arm/drone-docker ./cmd/drone-docker"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/arm/drone-docker ./cmd/drone-docker"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      {
-         "commands": [
-            "./release/linux/arm/drone-docker --help"
-         ],
-         "image": "golang:1.11",
-         "name": "executable",
-         "pull": "always"
-      },
-      {
-         "image": "plugins/docker:linux-arm",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/docker/Dockerfile.linux.arm",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker",
-            "tags": "linux-arm",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-arm",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-arm",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/docker/Dockerfile.linux.arm",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-arm-docker
+
+platform:
+  os: linux
+  arch: arm
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/arm/drone-docker ./cmd/drone-docker
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/arm/drone-docker ./cmd/drone-docker
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: executable
+  pull: always
+  image: golang:1.11
+  commands:
+  - ./release/linux/arm/drone-docker --help
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-arm
+  settings:
+    daemon_off: false
+    dockerfile: docker/docker/Dockerfile.linux.arm
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker
+    tags: linux-arm
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-arm
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-arm
+    create: true
+    daemon_off: false
+    dockerfile: docker/docker/Dockerfile.linux.arm
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/docker
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- testing
+
 ---
-{
-   "depends_on": [
-      "linux-amd64-docker",
-      "linux-arm64-docker",
-      "linux-arm-docker"
-   ],
-   "kind": "pipeline",
-   "name": "notifications-docker",
-   "platform": {
-      "arch": "amd64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "image": "plugins/manifest",
-         "name": "manifest",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "ignore_missing": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "spec": "docker/docker/manifest.tmpl",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         }
-      },
-      {
-         "image": "plugins/webhook",
-         "name": "microbadger",
-         "pull": "always",
-         "settings": {
-            "urls": {
-               "from_secret": "microbadger_docker"
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**"
-      ]
-   }
-}
+kind: pipeline
+name: notifications-docker
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: manifest
+  pull: always
+  image: plugins/manifest
+  settings:
+    auto_tag: true
+    ignore_missing: true
+    password:
+      from_secret: docker_password
+    spec: docker/docker/manifest.tmpl
+    username:
+      from_secret: docker_username
+
+- name: microbadger
+  pull: always
+  image: plugins/webhook
+  settings:
+    urls:
+      from_secret: microbadger_docker
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+
+depends_on:
+- linux-amd64-docker
+- linux-arm64-docker
+- linux-arm-docker
+
 ---
-{
-   "depends_on": [
-      "linux-amd64-docker"
-   ],
-   "kind": "pipeline",
-   "name": "linux-amd64-acr",
-   "platform": {
-      "arch": "amd64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/amd64/drone-acr ./cmd/drone-acr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/amd64/drone-acr ./cmd/drone-acr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      null,
-      {
-         "image": "plugins/docker:linux-amd64",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/acr/Dockerfile.linux.amd64",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr",
-            "tags": "linux-amd64",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-amd64",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-amd64",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/acr/Dockerfile.linux.amd64",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-amd64-acr
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/amd64/drone-acr ./cmd/drone-acr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/amd64/drone-acr ./cmd/drone-acr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-amd64
+  settings:
+    daemon_off: false
+    dockerfile: docker/acr/Dockerfile.linux.amd64
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr
+    tags: linux-amd64
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-amd64
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-amd64
+    create: true
+    daemon_off: false
+    dockerfile: docker/acr/Dockerfile.linux.amd64
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- linux-amd64-docker
+
 ---
-{
-   "depends_on": [
-      "linux-arm64-docker"
-   ],
-   "kind": "pipeline",
-   "name": "linux-arm64-acr",
-   "platform": {
-      "arch": "arm64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/arm64/drone-acr ./cmd/drone-acr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/arm64/drone-acr ./cmd/drone-acr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      null,
-      {
-         "image": "plugins/docker:linux-arm64",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/acr/Dockerfile.linux.arm64",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr",
-            "tags": "linux-arm64",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-arm64",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-arm64",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/acr/Dockerfile.linux.arm64",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-arm64-acr
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/arm64/drone-acr ./cmd/drone-acr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/arm64/drone-acr ./cmd/drone-acr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-arm64
+  settings:
+    daemon_off: false
+    dockerfile: docker/acr/Dockerfile.linux.arm64
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr
+    tags: linux-arm64
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-arm64
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-arm64
+    create: true
+    daemon_off: false
+    dockerfile: docker/acr/Dockerfile.linux.arm64
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- linux-arm64-docker
+
 ---
-{
-   "depends_on": [
-      "linux-arm-docker"
-   ],
-   "kind": "pipeline",
-   "name": "linux-arm-acr",
-   "platform": {
-      "arch": "arm",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/arm/drone-acr ./cmd/drone-acr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/arm/drone-acr ./cmd/drone-acr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      null,
-      {
-         "image": "plugins/docker:linux-arm",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/acr/Dockerfile.linux.arm",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr",
-            "tags": "linux-arm",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-arm",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-arm",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/acr/Dockerfile.linux.arm",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-arm-acr
+
+platform:
+  os: linux
+  arch: arm
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/arm/drone-acr ./cmd/drone-acr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/arm/drone-acr ./cmd/drone-acr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-arm
+  settings:
+    daemon_off: false
+    dockerfile: docker/acr/Dockerfile.linux.arm
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr
+    tags: linux-arm
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-arm
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-arm
+    create: true
+    daemon_off: false
+    dockerfile: docker/acr/Dockerfile.linux.arm
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/acr
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- linux-arm-docker
+
 ---
-{
-   "depends_on": [
-      "linux-amd64-docker"
-   ],
-   "kind": "pipeline",
-   "name": "linux-amd64-ecr",
-   "platform": {
-      "arch": "amd64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/amd64/drone-ecr ./cmd/drone-ecr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/amd64/drone-ecr ./cmd/drone-ecr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      null,
-      {
-         "image": "plugins/docker:linux-amd64",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/ecr/Dockerfile.linux.amd64",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr",
-            "tags": "linux-amd64",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-amd64",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-amd64",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/ecr/Dockerfile.linux.amd64",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-amd64-ecr
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/amd64/drone-ecr ./cmd/drone-ecr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/amd64/drone-ecr ./cmd/drone-ecr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-amd64
+  settings:
+    daemon_off: false
+    dockerfile: docker/ecr/Dockerfile.linux.amd64
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+    tags: linux-amd64
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-amd64
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-amd64
+    create: true
+    daemon_off: false
+    dockerfile: docker/ecr/Dockerfile.linux.amd64
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- linux-amd64-docker
+
 ---
-{
-   "depends_on": [
-      "linux-arm64-docker"
-   ],
-   "kind": "pipeline",
-   "name": "linux-arm64-ecr",
-   "platform": {
-      "arch": "arm64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/arm64/drone-ecr ./cmd/drone-ecr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/arm64/drone-ecr ./cmd/drone-ecr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      null,
-      {
-         "image": "plugins/docker:linux-arm64",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/ecr/Dockerfile.linux.arm64",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr",
-            "tags": "linux-arm64",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-arm64",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-arm64",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/ecr/Dockerfile.linux.arm64",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-arm64-ecr
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/arm64/drone-ecr ./cmd/drone-ecr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/arm64/drone-ecr ./cmd/drone-ecr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-arm64
+  settings:
+    daemon_off: false
+    dockerfile: docker/ecr/Dockerfile.linux.arm64
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+    tags: linux-arm64
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-arm64
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-arm64
+    create: true
+    daemon_off: false
+    dockerfile: docker/ecr/Dockerfile.linux.arm64
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- linux-arm64-docker
+
 ---
-{
-   "depends_on": [
-      "linux-arm-docker"
-   ],
-   "kind": "pipeline",
-   "name": "linux-arm-ecr",
-   "platform": {
-      "arch": "arm",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_COMMIT_SHA:0:8}\" -a -tags netgo -o release/linux/arm/drone-ecr ./cmd/drone-ecr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-push",
-         "pull": "always",
-         "when": {
-            "event": {
-               "exclude": [
-                  "tag"
-               ]
-            }
-         }
-      },
-      {
-         "commands": [
-            "go build -v -ldflags \"-X main.version=${DRONE_TAG##v}\" -a -tags netgo -o release/linux/arm/drone-ecr ./cmd/drone-ecr"
-         ],
-         "environment": {
-            "CGO_ENABLED": "0",
-            "GO111MODULE": "on"
-         },
-         "image": "golang:1.11",
-         "name": "build-tag",
-         "pull": "always",
-         "when": {
-            "event": [
-               "tag"
-            ]
-         }
-      },
-      null,
-      {
-         "image": "plugins/docker:linux-arm",
-         "name": "dryrun",
-         "pull": "always",
-         "settings": {
-            "daemon_off": "false",
-            "dockerfile": "docker/ecr/Dockerfile.linux.arm",
-            "dry_run": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr",
-            "tags": "linux-arm",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         },
-         "volumes": null,
-         "when": {
-            "event": [
-               "pull_request"
-            ]
-         }
-      },
-      {
-         "image": "plugins/docker:linux-arm",
-         "name": "publish",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "auto_tag_suffix": "linux-arm",
-            "create": true,
-            "daemon_off": "false",
-            "dockerfile": "docker/ecr/Dockerfile.linux.arm",
-            "repo": "864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr"
-         },
-         "volumes": null,
-         "when": {
-            "event": {
-               "exclude": [
-                  "pull_request"
-               ]
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**",
-         "refs/pull/**"
-      ]
-   },
-   "volumes": null
-}
+kind: pipeline
+name: linux-arm-ecr
+
+platform:
+  os: linux
+  arch: arm
+
+steps:
+- name: build-push
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_COMMIT_SHA:0:8}" -a -tags netgo -o release/linux/arm/drone-ecr ./cmd/drone-ecr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+      exclude:
+      - tag
+
+- name: build-tag
+  pull: always
+  image: golang:1.11
+  commands:
+  - go build -v -ldflags "-X main.version=${DRONE_TAG##v}" -a -tags netgo -o release/linux/arm/drone-ecr ./cmd/drone-ecr
+  environment:
+    CGO_ENABLED: 0
+    GO111MODULE: on
+  when:
+    event:
+    - tag
+
+- name: dryrun
+  pull: always
+  image: plugins/docker:linux-arm
+  settings:
+    daemon_off: false
+    dockerfile: docker/ecr/Dockerfile.linux.arm
+    dry_run: true
+    password:
+      from_secret: docker_password
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+    tags: linux-arm
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - pull_request
+
+- name: publish
+  pull: always
+  image: plugins/docker:linux-arm
+  settings:
+    auto_tag: true
+    auto_tag_suffix: linux-arm
+    create: true
+    daemon_off: false
+    dockerfile: docker/ecr/Dockerfile.linux.arm
+    repo: 864091978270.dkr.ecr.ap-southeast-2.amazonaws.com/plugins/ecr
+  when:
+    event:
+      exclude:
+      - pull_request
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+  - refs/pull/**
+
+depends_on:
+- linux-arm-docker
+
 ---
-{
-   "depends_on": [
-      "linux-amd64-ecr",
-      "linux-arm64-ecr",
-      "linux-arm-ecr"
-   ],
-   "kind": "pipeline",
-   "name": "notifications-ecr",
-   "platform": {
-      "arch": "amd64",
-      "os": "linux",
-      "version": null
-   },
-   "steps": [
-      {
-         "image": "plugins/manifest",
-         "name": "manifest",
-         "pull": "always",
-         "settings": {
-            "auto_tag": true,
-            "ignore_missing": true,
-            "password": {
-               "from_secret": "docker_password"
-            },
-            "spec": "docker/ecr/manifest.tmpl",
-            "username": {
-               "from_secret": "docker_username"
-            }
-         }
-      },
-      {
-         "image": "plugins/webhook",
-         "name": "microbadger",
-         "pull": "always",
-         "settings": {
-            "urls": {
-               "from_secret": "microbadger_ecr"
-            }
-         }
-      }
-   ],
-   "trigger": {
-      "ref": [
-         "refs/heads/master",
-         "refs/heads/movio",
-         "refs/tags/**"
-      ]
-   }
-}
+kind: pipeline
+name: notifications-ecr
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: manifest
+  pull: always
+  image: plugins/manifest
+  settings:
+    auto_tag: true
+    ignore_missing: true
+    password:
+      from_secret: docker_password
+    spec: docker/ecr/manifest.tmpl
+    username:
+      from_secret: docker_username
+
+- name: microbadger
+  pull: always
+  image: plugins/webhook
+  settings:
+    urls:
+      from_secret: microbadger_ecr
+
+trigger:
+  ref:
+  - refs/heads/master
+  - refs/heads/movio
+  - refs/tags/**
+
+depends_on:
+- linux-amd64-ecr
+- linux-arm64-ecr
+- linux-arm-ecr
+
 ...
