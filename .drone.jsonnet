@@ -3,7 +3,7 @@ local pipeline = import 'pipeline.libsonnet';
 [
   pipeline.test('linux', 'amd64'),
 
-  pipeline.build('docker', 'linux', 'amd64'),
+  // pipeline.build('docker', 'linux', 'amd64'),
   // pipeline.build('docker', 'linux', 'arm64'),
   // pipeline.build('docker', 'linux', 'arm'),
   // pipeline.notifications('docker', depends_on=[
